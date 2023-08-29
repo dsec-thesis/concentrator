@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "concentrator"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+cbor2 = "^5.4.6"
+lorarf = "^1.4.0"
+requests = "^2.31.0"
+requests-oauthlib = "^1.3.1"
+pydantic-settings = "^2.0.3"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
