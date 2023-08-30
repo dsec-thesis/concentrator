@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     config_logger()
+    logger.info("initializing concentrator")
     configs = create_configs()
     client = Client(
         token_manager=TokenManager(
@@ -25,8 +26,12 @@ def main():
     )
     lora = Lora(configs.lora)
 
+    logger.info("ready for receiving messages")
     while True:
         message = lora.receive()
+        logger.info(f"new message {message}")
         if not (space := spaces.get(message.id)):
+            logger.error(f"space not found, space id: {message.id}")
             continue
+        logger.info(f"updating space {space['id']}")
         client.update_space_state(space["id"], message.taken)
