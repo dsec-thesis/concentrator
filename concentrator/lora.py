@@ -1,8 +1,17 @@
+import logging
+from typing import Optional
+
 from LoRaRF import SX127x
 import cbor2
 from pydantic import BaseModel, ValidationError
 
 from concentrator.configs import LoraAntennaConfig, LoraConfig, SpiConfig
+
+logger = logging.getLogger(__name__)
+
+
+class LoraInitError(Exception):
+    pass
 
 
 class RxMessage(BaseModel):
@@ -13,12 +22,25 @@ class RxMessage(BaseModel):
 class Lora:
     def __init__(self, configs: LoraConfig) -> None:
         self._configs = configs
-        self._dev = self._init_dev(configs.spi)
+        self._init()
 
-    def _init_dev(self, configs: SpiConfig) -> SX127x:
-        dev = SX127x()
-        dev.begin(bus=configs.bus, cs=configs.chip_select, reset=configs.reset)
-        return dev
+    def receive(self) -> RxMessage:
+        self._apply_antenna_configs(self._configs.rx)
+        while True:
+            length = self._wait()
+            logger.debug(f"received message len {length}")
+            if not (message := self._process_received_message(length)):
+                continue
+            logger.debug("valid message received")
+            self._send_ack(message.id)
+            logger.debug("ack sent")
+            return message
+
+    def _init(self) -> None:
+        spi = self._configs.spi
+        self._dev = SX127x()
+        if not self._dev.begin(bus=spi.bus, cs=spi.chip_select, reset=spi.reset):
+            raise LoraInitError
 
     def _apply_antenna_configs(self, configs: LoraAntennaConfig):
         self._dev.setModem(self._dev.LORA_MODEM)
@@ -33,9 +55,8 @@ class Lora:
 
     def _send_ack(self, id: int) -> None:
         self._apply_antenna_configs(self._configs.tx)
-        ack = cbor2.dumps({"id": id})
         self._dev.beginPacket()
-        self._dev.write(ack, len(ack))
+        self._dev.write(id)
         self._dev.endPacket()
         self._dev.wait()
 
@@ -46,29 +67,20 @@ class Lora:
             if not (length := self._dev.available()):
                 continue
             if self._dev.status() == self._dev.STATUS_CRC_ERR:
+                logger.error("received message with crc error")
                 continue
             return length
 
-    def receive(self) -> RxMessage:
-        self._apply_antenna_configs(self._configs.rx)
-
-        while True:
-            print("waiting for message")
-            length = self._wait()
-            print("reading message")
-            frame = self._dev.read(length)
-            try:
-                print("decoding message")
-                raw_message = cbor2.loads(bytes(frame))
-            except (cbor2.CBORDecodeError, UnicodeDecodeError):
-                continue
-            try:
-                print("validating message")
-                message = RxMessage.model_validate(raw_message)
-            except ValidationError:
-                continue
-
-            print(message)
-            print("sending ack")
-            self._send_ack(message.id)
-            return message
+    def _process_received_message(self, length: int) -> Optional[RxMessage]:
+        message_bytes = bytes(self._dev.read(length))
+        try:
+            raw_message = cbor2.loads(message_bytes)
+        except (cbor2.CBORDecodeError, UnicodeDecodeError) as error:
+            logger.error(f"cbor decode error {error}")
+            return None
+        try:
+            message = RxMessage.model_validate(raw_message)
+        except ValidationError as error:
+            logger.error(f"error validating model {error}")
+            return None
+        return message
