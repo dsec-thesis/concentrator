@@ -1,5 +1,6 @@
 import logging
 import time
+import sys
 
 from concentrator.configs import create_configs
 from concentrator.logger import config_logger
@@ -14,6 +15,7 @@ Results
 Number of messages processed:   {processed_messages} messages
 Elapsed time:                   {elapsed_time:.2f} seconds
 Messages per second:            {processed_messages_per_second:.2f} messages/second
+Queue size:                     {queue_size} bytes
 
 """
 
@@ -25,10 +27,10 @@ def main():
     lora = Lora(configs.lora)
 
     logger.info("start")
-    start, processed_messages = time.time(), 0
+    start, processed_messages, queue = time.time(), 0, []
     try:
         while True:
-            lora.receive()
+            queue.append(lora.receive())
             processed_messages += 1
 
     except KeyboardInterrupt:
@@ -41,6 +43,7 @@ def main():
             processed_messages=processed_messages,
             elapsed_time=elapsed_time,
             processed_messages_per_second=processed_messages_per_second,
+            queue_size=sys.getsizeof(queue),
         )
     )
 
