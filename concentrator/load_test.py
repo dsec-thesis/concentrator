@@ -10,9 +10,10 @@ logger = logging.getLogger(__name__)
 
 RESTUL_TEMPLATE = """
 
-Processed messages: {processed_messages}
-Elapsed time: {elapsed_time}
-Processed messages per second: {processed_messages_per_second}
+Results
+Number of messages processed:   {processed_messages} messages
+Elapsed time:                   {elapsed_time:.2f} seconds
+Messages per second:            {processed_messages_per_second:.2f} messages/second
 
 """
 
